@@ -29,13 +29,25 @@ rolling and best Ao5/Ao12/Ao50/Ao100, a distribution histogram, and CSV export.
 ## Install
 
 ```bash
-omarchy plugin add pyang.cubetimer     # or copy this directory into
-                                       # ~/.config/omarchy/plugins/
-./install-bindings                     # optional: SUPER + ALT + C
+omarchy plugin add https://github.com/benjamin225yang/omarchy-cubetimer.git --enable
 ```
 
-Then put `{"id": "pyang.cubetimer"}` in the bar layout in
-`~/.config/omarchy/shell.json` if `omarchy plugin add` didn't.
+That drops it into `~/.config/omarchy/plugins/` and puts the widget in the bar.
+If you skip `--enable`, add `{"id": "pyang.cubetimer"}` to the bar layout in
+`~/.config/omarchy/shell.json` yourself.
+
+Optional keybinding — `SUPER + ALT + C`, refuses to clobber a key already in
+use:
+
+```bash
+~/.config/omarchy/plugins/pyang.cubetimer/install-bindings
+```
+
+Later, to pick up changes:
+
+```bash
+omarchy plugin update pyang.cubetimer
+```
 
 ## Keys
 
