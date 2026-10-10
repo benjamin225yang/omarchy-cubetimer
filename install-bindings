@@ -1,0 +1,79 @@
+#!/usr/bin/env bash
+# Add this plugin's Hyprland keybinding.
+#
+# `omarchy plugin add` places the widget in the bar and stops there -- the
+# manifest has no way to declare a key. So the binding is opt-in, and this puts
+# it in for you.
+#
+#   ./install-bindings            add SUPER+ALT+C
+#   ./install-bindings --remove   take it out again
+set -euo pipefail
+
+BINDINGS="${HOME}/.config/hypr/bindings.lua"
+MARK="-- pyang.cubetimer (speedcubing timer)"
+COMBO="SUPER + ALT + C"
+
+say() { printf '%s\n' "$*"; }
+die() { printf 'error: %s\n' "$*" >&2; exit 1; }
+
+[[ -f $BINDINGS ]] || die "no $BINDINGS -- is this an Omarchy system?"
+
+backup() { cp "$BINDINGS" "${BINDINGS}.bak.$(date +%s)"; }
+
+reload() {
+  command -v hyprctl >/dev/null || return 0
+  hyprctl reload >/dev/null 2>&1 || true
+  local errs
+  errs=$(hyprctl configerrors 2>/dev/null | tr -d '[:space:]')
+  [[ -z $errs ]] || die "Hyprland reported config errors -- check $BINDINGS"
+}
+
+if [[ ${1:-} == --remove ]]; then
+  command grep -qF -- "$MARK" "$BINDINGS" || { say "not installed, nothing to do"; exit 0; }
+  backup
+  awk -v mark="$MARK" '
+    index($0, mark) { skip = 1; next }
+    skip > 0 && /^o\.bind\(/ { skip--; next }
+    { skip = 0; print }
+  ' "$BINDINGS" > "${BINDINGS}.tmp" && mv "${BINDINGS}.tmp" "$BINDINGS"
+  reload
+  say "removed. $COMBO is free again."
+  exit 0
+fi
+
+command grep -qF -- "$MARK" "$BINDINGS" && { say "already installed -- nothing to do."; exit 0; }
+
+# Squash a combo to modifiers-and-key with no spaces or pluses, so the config
+# spelling ("SUPER + ALT + C") and the listing spelling ("SUPER ALT + C")
+# compare equal. Getting this wrong is not harmless: the check silently passes
+# and the bind lands on top of whatever already held the key.
+canon() { tr -d ' +' | tr '[:lower:]' '[:upper:]'; }
+
+# Refuse to clobber a key that is already spoken for. Both the file and
+# Omarchy's live listing are checked -- the listing reflects running Hyprland
+# state, and `hyprctl reload` is asynchronous, so on its own it can report a key
+# as free for a moment after something else claimed it.
+bound_already() {
+  local combo=$1 pattern=${1//+/\\+} want
+  command grep -qE "^[^-]*o\.bind\(\s*\"${pattern}\"" "$BINDINGS" && return 0
+  command -v omarchy >/dev/null || return 1
+  want=$(printf '%s' "$combo" | canon)
+  omarchy menu keybindings --print 2>/dev/null \
+    | awk -F'→' 'NF > 1 { print $1 }' \
+    | canon \
+    | command grep -qx -- "$want"
+}
+
+if bound_already "$COMBO"; then
+  die "$COMBO is already bound. Edit $BINDINGS by hand, or rebind that first."
+fi
+
+backup
+cat >> "$BINDINGS" <<'LUA'
+
+-- pyang.cubetimer (speedcubing timer)
+o.bind("SUPER + ALT + C", "Cube timer", "omarchy-shell pyang.cubetimer toggle")
+LUA
+reload
+say "added:"
+say "  SUPER + ALT + C   open the timer"
